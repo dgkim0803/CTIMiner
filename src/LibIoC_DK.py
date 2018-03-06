@@ -7,6 +7,8 @@ This script includes several useful utilities to analyze IoC.
 '''
 
 import re, requests
+from aetypes import end
+from datetime import datetime
 
 pattern = {}
 pattern['url'] = '([a-z]{3,}\:\/\/[\S]{16,})[^~!@#$%&*()<>?"]'
@@ -85,14 +87,14 @@ def filterRegularIoC(val,type=None):
 
 
 def checkIoCType(ioc):
+    if len(re.findall(pattern['email'],ioc)) > 0:
+        return 'email'
     if len(re.findall(pattern['url'],ioc)) > 0:
         return 'url'
     if len(re.findall(pattern['host'],ioc)) > 0:
         return 'host'
     if len(re.findall(pattern['ip'],ioc)) > 0:
         return 'ip'
-    if len(re.findall(pattern['email'],ioc)) > 0:
-        return 'email'
     if len(re.findall(pattern['md5'],ioc)) > 0:
         return 'md5'
     if len(re.findall(pattern['sha1'],ioc)) > 0:
@@ -143,3 +145,17 @@ def getFileTimestamp(sha256):
     i = tmp.find('Compilation timestamp')+len('Compilation timestamp</span> ')
     return tmp[i:i+10]
 
+
+def getFileName(fullpath):
+    delim = {"//", "/", "\\"}
+    for d in delim:
+        tmp = fullpath.split(d)
+        if len(tmp) > 1:
+            return tmp[len(tmp)-1]
+    return fullpath
+
+def debugging(msg, debug, logging=False, f=None):
+    if debug:
+        print "[%s] %s"%(str(datetime.now()),msg)
+    if logging:
+        f.write("[%s] %s\n"%(str(datetime.now()),msg))

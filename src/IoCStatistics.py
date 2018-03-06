@@ -91,9 +91,11 @@ class IoCStatistics:
                     try:
                         if self.report_buf.cell(row,col).value == ioc.encode('utf-8').lower():
                             return True
-                    except UnicodeEncodeError: 
-                        print UnicodeEncodeError.message+' while executing checkIoCInReport function'
-                        print 'The original IoC: '+ ioc + ' '
+                    except UnicodeError: 
+                        if self.report_buf.cell(row,col).value == ioc.lower():
+                            return True
+#                        print UnicodeError.message+' while executing checkIoCInReport function'
+#                        print 'The original IoC: '+ ioc + ' '
             return False
         else:
             if ioc.encode('utf-8').lower() in self.report_buf:
@@ -167,19 +169,17 @@ class IoCStatistics:
     def setReportBuffer(self, fname):
         if fname.lower().endswith('.pdf'):
             self.report_type = 'pdf'
-            #self.report_buf = subprocess.check_output('python ./pdfminer/tools/pdf2txt.py \''+fname+'\'', shell=True).lower()
             scripts_path = ''
             if os.name == 'nt':
                 scripts_path = sys.prefix+'/Scripts'
             elif os.name == 'posix':
-                #scripts_path = sys.prefix+'/lib/python'+str(sys.version_info.major)+'\.'+str(sys.version_info.minor)
                 scripts_path = '/usr/local/bin' 
                 
             try:
                 self.report_buf = subprocess.check_output('python '+scripts_path+'/pdf2txt.py \"'+fname+'\"', shell=True).lower()
-            except UnicodeEncodeError or subprocess.CalledProcessError:
-                if UnicodeEncodeError:
-                    print UnicodeEncodeError.message+' while converting the text in the report'
+            except UnicodeError or subprocess.CalledProcessError:
+                if UnicodeError:
+                    print UnicodeError.message
                 elif subprocess.CalledProcessError:
                     print subprocess.CalledProcessError.message
             
@@ -190,17 +190,20 @@ class IoCStatistics:
             for row in range(self.report_buf.nrows):
                 for col in range(self.report_buf.ncols):
                     try:
-                        self.report_buf.cell(row,col).value = self.report_buf.cell(row,col).value.lower()
-                    except UnicodeEncodeError:
-                        print UnicodeEncodeError.message+'\n'+self.report_buf.cell(row,col).value
+                        self.report_buf.cell(row,col).value = self.report_buf.cell(row,col).value.encode('utf-8').lower()
+                    except UnicodeError:
+                        print UnicodeError.message+'\n'+self.report_buf.cell(row,col).value
                         
         else:
             self.report_type = 'etc'
-            self.report_buf = open(fname, 'r').read().lower()
+            try:
+                self.report_buf = open(fname, 'r').read().encode('utf-8').lower()
+            except UnicodeError:
+                print UnicodeError.message
             
         self.report_name = fname
-        
-        
+        return
+    
     def flushReportBuffer(self):
         self.report_type = None
         self.report_buf = None
@@ -282,11 +285,12 @@ class IoCStatistics:
         
         tree = ET.ElementTree(root)
         tree.write(self.statistic_fname)
+        return
         
     def convertIoCType(self, ioc_type):
         if ioc_type=='ip' or ioc_type=='host' or ioc_type=='email' or ioc_type=='cve' or ioc_type=='filename' or ioc_type=='filepath' or ioc_type=='signcheck' or ioc_type=='hash' or ioc_type=='string':
             return ioc_type
-        elif  ioc_type=='ip' or ioc_type=='src_ip' or ioc_type=='dst_ip':
+        elif  ioc_type=='ip' or ioc_type=='src_ip' or ioc_type=='dest_ip':
             return 'ip'
         elif  ioc_type=='md5' or ioc_type=='sha1' or ioc_type=='sha256':
             return 'hash'
@@ -305,9 +309,9 @@ class IoCStatistics:
         
     # category 3
     def addCategory3(self, ioc, data_type):
-        if self.sharedIoC.count(ioc) == 0:
-            self.stat_tmp_category1[data_type] -= 1
-            self.stat_tmp_category1['count'] -= 1
+        if ioc not in self.sharedIoC:
+            self.stat_tmp_category2[data_type] -= 1
+            self.stat_tmp_category2['count'] -= 1
             self.stat_tmp_category3[data_type] += 1
             self.stat_tmp_category3['count'] += 1
             self.sharedIoC.append(ioc)           
@@ -317,7 +321,7 @@ class IoCStatistics:
         self.stat_tmp_category4[data_type] += 1
         self.stat_tmp_category4['count'] += 1
         
-    # category 4
+    # category 5
     def addcategory5(self, data_type):
         self.stat_tmp_category5[data_type] += 1
         self.stat_tmp_category5['count'] += 1

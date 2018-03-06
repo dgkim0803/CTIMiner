@@ -6,16 +6,19 @@ This is the main module for CTI_DBGenerator.
 from iocp import Parser
 from os.path import isfile, join
 from joblib.parallel import delayed
+from datetime import datetime
 import xml.etree.ElementTree as ET
 import itertools, csv, hashlib, requests, os, joblib
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
-import MISPConnector, IoCStatistics
+import MISPConnector, IoCStatistics, LibIoC_DK
 
 # 1 : parsing APT report only
 # 2 : adding malware repository IoCs only
 # 3 : full functionality mode(MODE 1 & 2)
 _MODE_ = 3
+_DEBUG_ = True
+_LOGGING_ = True
 
 # True : calculate statistical characteristics
 _STAT_ = True
@@ -29,8 +32,17 @@ _DOWNLOAD_MALWARE_ = False
 _PARALLELIZE_FILE_PROCESSING_ = False
 _PARALLELIZE_ATTRIB_ADDITION_ = False
 
-# the required system configuration should be set in the config file.
-config_file = 'config_PC.xml'
+# the required system configuration should be set in the config file
+#config_file = 'config_PC.xml'
+config_file = 'config_Mac.xml'
+log_file = 'log.txt'
+fileProcessingResult_file = 'fileProcessingResult.xml'
+hFile = None # log file handle
+if _LOGGING_:
+    if os.path.isfile(log_file):
+        hFile = open(log_file,"a")
+    else:
+        hFile = open(log_file,"w")
 
 if _STAT_:
     ioc_stat = IoCStatistics.IoCStatistics()
@@ -128,9 +140,9 @@ def processFile(misp, f, config_value):
     # Adding MISP by APT report-wise manner: one MISP event is consisted by one API report. 
     if _MISP_EVENT_GENERATION_TYPE == 1: 
         # check if the event data is already in MISP server 
-        if misp.checkEventExist(f[f.rfind('\\')+1:]) == True:
+        if misp.checkEventExist(LibIoC_DK.getFileName(f)) == True:
             return
-        print f[f.rfind('\\')+1:]
+        LibIoC_DK.debugging("Processing file: %s"%(LibIoC_DK.getFileName(f)), _DEBUG_, _LOGGING_, hFile) 
         # extract IoCs in the report file
         ioc = parse_ioc(f)
         if ioc is not None and len(ioc) > 0:
@@ -146,7 +158,7 @@ def processFile(misp, f, config_value):
     # if further analysis results could be retrieved from malware repository, 
     # otherwise rest of IoCs are stored in one MISP event under the event name as the title of the report.
     elif _MISP_EVENT_GENERATION_TYPE == 2:
-        if misp.checkMISPReportEventExist(f[f.rfind('\\')+1:]):
+        if misp.checkMISPReportEventExist(LibIoC_DK.getFileName(f)):
             return
         nonHash_IoC = []
         hash_IoC = []
@@ -156,10 +168,9 @@ def processFile(misp, f, config_value):
                 # if the IoC is a hash value and the analysis result of the hash could be retrieved,
                 # create a MISP event of the hash value 
                 if attr[0] == 'MD5' or attr[0] == 'SHA1' or attr[0] == 'SHA256':
-                    hash_IoC.append(('report',attr[0],attr[1]))
                     if _STAT_:
                         ioc_stat.increaseHashInReport()
-                    
+
                 # if the IoC is not a hash value or the analysis result of a hash could not be retrieved,
                 # keep the IoC to store under the MISP event of the API report
                 else:
@@ -168,30 +179,29 @@ def processFile(misp, f, config_value):
             # add hash IoCs in each MISP events
             if (_MODE_==2 or _MODE_==3) and len(hash_IoC) > 0:
                 for attr in hash_IoC:
-                    if not misp.createMISPEvent(attr[2], f):
-                        nonHash_IoC.append(attr)
-                    elif _STAT_:
-                        ioc_stat.increaseAnalyzedHash()
+                    misp.createMISPEvent(attr[2], f)
             
             # add non-hash IoCs in one MISP event
             if (_MODE_==1 or _MODE_==3) and len(nonHash_IoC) > 0:
                 date = getFileDate(f, config_value)
-                misp.createMISPEvent(nonHash_IoC, f, date)
+                misp.createMISPEvent(nonHash_IoC+hash_IoC, f, date)
                                      
             if _STAT_:
                 ioc_stat.finalizeTempStatistics()
                 ioc_stat.reset()
                 ioc_stat.saveIoCStatistics()
+    return
     
     
 def processFileList(misp, file_names, config_value):
+    processed_list_root = openFileProcessingResult()
     # Adding MISP by APT report-wise manner: one MISP event is consisted by one API report. 
     if _MISP_EVENT_GENERATION_TYPE == 1: 
         for f in file_names:
             # check if the event data is already in MISP server 
-            if misp.checkEventExist(f[f.rfind('\\')+1:]) == True:
+            if misp.checkEventExist(LibIoC_DK.getFileName(f)) == True:
+                LibIoC_DK.debugging("The MISP file event ALREADY exists: %s" %(LibIoC_DK.getFileName(f)), _DEBUG_, _LOGGING_, hFile)
                 continue
-            print f[f.rfind('\\')+1:]
             # extract IoCs in the report file
             ioc = parse_ioc(f)
             if ioc is not None and len(ioc) > 0:
@@ -208,10 +218,12 @@ def processFileList(misp, file_names, config_value):
     # otherwise rest of IoCs are stored in one MISP event under the event name as the title of the report.
     elif _MISP_EVENT_GENERATION_TYPE == 2:
         for f in file_names:
-            if misp.checkMISPReportEventExist(f[f.rfind('\\')+1:]):
+            if isFileProcessedBefore(processed_list_root, LibIoC_DK.getFileName(f)) or misp.checkMISPReportEventExist(LibIoC_DK.getFileName(f)):
                 continue
             nonHash_IoC = []
             hash_IoC = []
+
+            LibIoC_DK.debugging("Parsing IoC...", _DEBUG_, _LOGGING_, hFile) 
             ioc = parse_ioc(f)
             if ioc is not None and len(ioc) > 0:
                 for attr in ioc:
@@ -230,26 +242,64 @@ def processFileList(misp, file_names, config_value):
                 # add hash IoCs in each MISP events
                 if (_MODE_==2 or _MODE_==3) and len(hash_IoC) > 0:
                     for attr in hash_IoC:
-                        if not misp.createMISPEvent(attr[2], f):
+                        if misp.createMISPEvent(attr, f):
+                            misp.ioc_stat.increaseAnalyzedHash()
+                        else:
                             nonHash_IoC.append(attr)
-                        elif _STAT_:
-                            ioc_stat.increaseAnalyzedHash()
-                
                 # add non-hash IoCs in one MISP event
                 if (_MODE_==1 or _MODE_==3) and len(nonHash_IoC) > 0:
                     date = getFileDate(f, config_value)
-                    misp.createMISPEvent(nonHash_IoC, f, date)
+                    if misp.createMISPEvent(nonHash_IoC, f, date):
+                        addFileProcessingResult(processed_list_root, LibIoC_DK.getFileName(f), 'success')
+                    else:
+                        addFileProcessingResult(processed_list_root, LibIoC_DK.getFileName(f), 'fault')
                     
                 if _STAT_:
                     ioc_stat.finalizeTempStatistics()
                     ioc_stat.reset()
                     ioc_stat.saveIoCStatistics()
+            else:
+                LibIoC_DK.debugging("NO IoC found in %s" %(LibIoC_DK.getFileName(f)), _DEBUG_, _LOGGING_, hFile) 
+                addFileProcessingResult(processed_list_root, LibIoC_DK.getFileName(f), 'noIoC')
+
+            saveFileProcessingResult(processed_list_root)
+    return
+
+def isFileProcessedBefore(root, fName):
+    for f in root.findall('file'):
+        if f.attrib['title'] == fName:
+            return True
+    return False
+
+def openFileProcessingResult():
+    root = None
+    if os.path.isfile(fileProcessingResult_file):
+        tree = ET.parse(fileProcessingResult_file)
+        root = tree.getroot()
+    else:
+        root = ET.Element('FileProcessingResult')
+        tree = ET.ElementTree(root)
+        tree.write(fileProcessingResult_file)
+    return root
                     
+def addFileProcessingResult(root, fName, result):
+    ET.SubElement(root, 'file', {'title':fName,'result':result})
+    return
+ 
+def saveFileProcessingResult(root):
+    tree = ET.ElementTree(root)
+    tree.write(fileProcessingResult_file)
+    return
+
 '''
  The main routine
 '''
 if __name__ == '__main__':
-    
+    if _DEBUG_:
+        LibIoC_DK.debugging("**********************************************************", _DEBUG_, _LOGGING_, hFile)
+        LibIoC_DK.debugging("******System Execution at %s******"%(str(datetime.now())), _DEBUG_, _LOGGING_, hFile)
+        LibIoC_DK.debugging("**********************************************************", _DEBUG_, _LOGGING_, hFile)
+
     # Load configuration file
     config_value = getConfig(config_file)
     file_names = getFileName(config_value['ReportRoot'])
@@ -259,4 +309,10 @@ if __name__ == '__main__':
         joblib.Parallel(joblib.cpu_count())(delayed(processFile)(misp, f, config_value) for f in file_names)
     else:
         processFileList(misp, file_names, config_value)
+        
+    if _DEBUG_:
+        LibIoC_DK.debugging("All file processing FINISHED!!!", _DEBUG_, _LOGGING_, hFile)
+        
+    if _LOGGING_:
+        hFile.close()
     
