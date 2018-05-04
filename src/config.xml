@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <config>
-	<ReportRoot></ReportRoot><ReportList></ReportList><MISP_URL></MISP_URL>
+	<ReportRoot></ReportRoot><ReportList></ReportList><SampleRoot></SampleRoot><MISP_URL></MISP_URL>
 	<MISP_API_Key></MISP_API_Key>
 	<Malware_Repository_API_Key></Malware_Repository_API_Key>
+	<Virustotal_API_Key></Virustotal_API_Key>
 	</config>

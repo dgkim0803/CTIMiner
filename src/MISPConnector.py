@@ -243,7 +243,7 @@ class MISPConnector(object):
     #    filename: the root filename where the hash value is originated.
     # @ output
     #    Return True if the MISP event is created, otherwise return False.
-    def createMISPEventFromHash(self, _hash, filename, additional_hash=False):  
+    def createMISPEventFromHash(self, _hash, filename, additional_hash=False):
         LibIoC_DK.debugging("Creating the MISP hash event: %s" %(_hash), main._DEBUG_, main._LOGGING_, main.hFile)
             
         _hash = _hash.lower()
@@ -256,18 +256,7 @@ class MISPConnector(object):
         
         if not result:
             return False
-        
-        '''
-        # add timestamp of the hash file as the MISP event time
-        sha256 = ''
-        for attr in result:
-            if attr[0].lower() == 'sha256':
-                sha256 = attr[1]
-                break        
-        _date = self.malware_repo_connector.getMalwareCollectedDate(_hash)
-        event = self.misp_connection.new_event(0, 1, 2, _hash, date = LibIoC_DK.getFileTimestamp(sha256))
-        '''
-        
+                
         event = self.misp_connection.new_event(0, 1, 2, _hash)
         self.misp_connection.add_named_attribute(event, 'Other', 'comment', LibIoC_DK.getFileName(filename))   # this will work as the ground truth of IoCs      
         
@@ -275,27 +264,35 @@ class MISPConnector(object):
         md5=result.pop(0)[2]
         sha1=result.pop(0)[2]
         sha256=result.pop(0)[2]
-        attr_added = False
         
+        self.misp_connection.add_hashes(event, category='Payload installation', md5=md5)
+        if main._STAT_:
+            self.ioc_stat.addCategory2('hash')
+        self.misp_connection.add_hashes(event, category='Payload installation', sha1=sha1)
+        if main._STAT_:
+            self.ioc_stat.addCategory2('hash')
+        self.misp_connection.add_hashes(event, category='Payload installation', sha256=sha256)
+        if main._STAT_:
+            self.ioc_stat.addCategory2('hash')
+        
+        sample_path = self.config['SampleRoot']+'/'+LibIoC_DK.getReportPublicationYear(filename)
         if main._DOWNLOAD_MALWARE_:
-            malware_buffer = self.malware_repo_connector.downloadMalware(sha256)
-            if malware_buffer:
-                f = open(_hash, 'w')
-                f.write(malware_buffer)
-                self.malware_repo_connector.unzipMalware(_hash)
-    #            os.unlink(f.name)
-                self.misp_connection.add_attachment(event, f, category='Payload installation')
-                f.close()
-                attr_added = True
-                
-        if not main._DOWNLOAD_MALWARE_ or not malware_buffer:
-            self.misp_connection.add_hashes(event, category='Payload installation', md5=md5)
-            self.ioc_stat.addCategory2('hash')
-            self.misp_connection.add_hashes(event, category='Payload installation', sha1=sha1)
-            self.ioc_stat.addCategory2('hash')
-            self.misp_connection.add_hashes(event, category='Payload installation', sha256=sha256)
-            self.ioc_stat.addCategory2('hash')
-            attr_added = True
+            if not os.path.exists(sample_path+'/'+_hash):
+                malware_buffer = self.malware_repo_connector.downloadMalware(sha256, False)
+                if malware_buffer:
+                    if not os.path.exists(sample_path):
+                        os.makedirs(sample_path)
+                    f = open(sample_path+'/'+_hash, 'wb')
+                    f.write(malware_buffer)
+                    f.close()
+                    extracted = self.malware_repo_connector.unzipMalware(sample_path+'/'+_hash, sample_path)
+                    if extracted.lower() != _hash.lower():
+                        os.remove(sample_path+'/'+_hash)
+                        _hash = extracted
+                    
+                header_info = LibIoC_DK.getMalwareHeaderInfo(sample_path+'/'+_hash)
+                if header_info is not None:
+                    self.addMalwareHeaderInfo(header_info, event)            
         
         if main._STAT_ and self.ioc_stat.report_name != filename:
             self.ioc_stat.setReportBuffer(filename)
@@ -303,20 +300,34 @@ class MISPConnector(object):
         if main._PARALLELIZE_ATTRIB_ADDITION_:
             # Parallelized Version
             print '[Hash] Parallelized attribute storing...'
-            attr_added = joblib.Parallel(joblib.cpu_count())(delayed(addAttribute)(self, event, attr) for attr in result)   
-            if (type(attr_added)==bool and not attr_added) or (type(attr_added)==list and not (True in attr_added)):
-                self.misp_connection.delete_event(_hash)
-                LibIoC_DK.debugging("No attribute added for the hash event: %s" %(_hash) , main._DEBUG_, main._LOGGING_, main.hFile)
-                return False
+            joblib.Parallel(joblib.cpu_count())(delayed(addAttribute)(self, event, attr) for attr in result)   
         else:
             # Sequential Version
             for attr in result:
-                attr_added = self.addAttribute(event, attr, filename) or attr_added
+                self.addAttribute(event, attr, filename)
 
         LibIoC_DK.debugging("The MISP hash event created", main._DEBUG_, main._LOGGING_, main.hFile)
-        return attr_added
+        return True
             
             
+    def addMalwareHeaderInfo(self, info, event):
+        if info is None:
+            return 
+        
+        if 'TimeStamp' in info:
+            event['Event']['date'] = info['TimeStamp'].partition(" ")[0]
+            self.misp_connection.update(event)
+            self.misp_connection.add_named_attribute(event, 'External analysis', 'text', info['TimeStamp'], comment='TimeStamp')  
+        elif 'Author' in info:
+            self.misp_connection.add_named_attribute(event, 'External analysis', 'text', info['Author'], comment='Author')  
+        elif 'Title' in info:
+            self.misp_connection.add_named_attribute(event, 'External analysis', 'text', info['Title'], comment='Title')  
+        elif 'Packer' in info:
+            self.misp_connection.add_named_attribute(event, 'External analysis', 'text', info['Packer'], comment='Packer')  
+            
+        return
+
+    
     def addAttribute(self, event, attr, filepath):
         LibIoC_DK.debugging("Adding Attribute: filename(%s), attribute(%s)" %(LibIoC_DK.getFileName(filepath),attr) , main._DEBUG_, main._LOGGING_, main.hFile)
         return addAttribute(self, event, attr, filepath)
@@ -347,6 +358,8 @@ class MISPConnector(object):
                 response = self.misp_connection.search(attr)
             except requests.exceptions.HTTPError:
                 LibIoC_DK.debugging("[checkAttribute] HTTPError while searching "+attr, main._DEBUG_, main._LOGGING_, main.hFile)
+                return False 
+            except:
                 return False 
                 
             if response.has_key('response'):
@@ -381,12 +394,10 @@ class MISPConnector(object):
         return False
     
     
-    def exportXML(self, from_idx, to_idx, output_filename):
-        import dicttoxml
+    def exportXML_EID(self, from_idx, to_idx, output_filename):
         import xml.etree.ElementTree as ET
-        root = ET.Element('response')
+        root = ET.Element('CTIMinerDataset')
         for i in range(from_idx, to_idx):
-            
             try:
                 event = self.misp_connection.get_event(i)
             except:
@@ -394,14 +405,99 @@ class MISPConnector(object):
                 continue
             if 'message' in event and event['message'] == 'Invalid event.':
                 continue
-            xml = ET.fromstring( dicttoxml.dicttoxml(event) )
-            root.append(xml.find('Event'))
-        
+            
+            root = self.addEventDataToElementTree(root, event)
+            
         tree = ET.ElementTree(root)
         tree.write(output_filename)
         return
     
-    
+    # TODO:
+    def exportXML_Date(self, year, event_type, output_filename):
+        #import xml.etree.ElementTree as ET
+        from lxml import etree as ET
+        root = ET.Element('CTIMinerDataset')
+        
+        report_event = [];
+        for mm in range(1,13):
+            if mm < 10:
+                from_date = str(year)+"-0%d-01" %(mm)
+                to_date = str(year)+"-0%d-31" %(mm)
+            else:
+                from_date = str(year)+"-%d-01" %(mm)
+                to_date = str(year)+"-%d-31" %(mm)
+            try:
+                ee = self.misp_connection.search(date_from=from_date, date_to=to_date)['response']
+            except Exception, e:
+                print 'error %s / (year=%d, month=%d)' %(str(e), year, mm)
+                continue
+            
+            for e in ee:
+                if LibIoC_DK.isHash(e['Event']['info']):
+                    continue
+                else:
+                    if event_type =='report':
+                        root = self.addEventDataToElementTree(root, e)
+                    elif event_type =='malware':
+                        report_event.append(e)
+                
+        if event_type =='report':
+            tree = ET.ElementTree(root)
+            f = open(output_filename, 'wb')
+            f.write(ET.tostring(tree, pretty_print=True))
+            f.close()
+            return
+        
+        for r in report_event:
+            for yy in range(2008, 3000):
+                for mm in range(1,13):
+                    try:
+                        if mm < 10:
+                            from_date = str(yy)+"-0%d-01" %(mm)
+                            to_date = str(yy)+"-0%d-31" %(mm)
+                        else:
+                            from_date = str(yy)+"-%d-01" %(mm)
+                            to_date = str(yy)+"-%d-31" %(mm)  
+                        ee = self.misp_connection.search(values=r['Event']['info'], category="Other", type_attribute="comment", date_from=from_date, date_to=to_date)['response']
+                        for e in ee:
+                            if LibIoC_DK.isHash(e['Event']['info']):
+                                root = self.addEventDataToElementTree(root, e)
+                    except Exception, e:
+                        print 'error %s / %s (month=%d, year=%d)' %(str(e), r['Event']['info'], mm, yy)
+                        continue
+                    
+        tree = ET.ElementTree(root)
+        f = open(output_filename, 'wb')
+        f.write(ET.tostring(tree, pretty_print=True))
+        f.close()
+        return 
+        
+        
+    def addEventDataToElementTree(self, tree_root, event):
+        import dicttoxml
+        import xml.etree.ElementTree as ET
+        xml = ET.fromstring( dicttoxml.dicttoxml(event) )
+        tmp = xml.find('Event')
+        
+        eventroot = ET.SubElement(tree_root, 'Event')
+        
+        ET.SubElement(eventroot, 'id').text = tmp.find('id').text
+        ET.SubElement(eventroot, 'date').text = tmp.find('date').text
+        ET.SubElement(eventroot, 'info').text = tmp.find('info').text
+
+        attr_root = ET.SubElement(eventroot, 'Attribute')
+        
+        for i in tmp.find('Attribute').findall('item'):
+            item_root = ET.SubElement(attr_root, 'item')
+
+            ET.SubElement(item_root, 'category').text = i.find('category').text
+            ET.SubElement(item_root, 'comment').text = i.find('comment').text
+            ET.SubElement(item_root, 'value').text = i.find('value').text
+            ET.SubElement(item_root, 'type').text = i.find('type').text
+            ET.SubElement(item_root, 'id').text = i.find('id').text
+            
+        return tree_root
+            
 ################################################################
 # The collected attributes are stored to MISP through this function.
 # The data filtering that checks redundancy and noise is applied within this function. 
@@ -433,13 +529,15 @@ def addAttribute(connector, event, attr, filepath):
                 if LibIoC_DK.isHash(event_name):
                     for a in event['Event']['Attribute']:
                         if a['category'] == 'Other' and a['value'] == connector.misp_connection.get_event(curr_id)['Event']['info']:
-                            connector.ioc_stat.addCategory3(attr_lower_case, connector.ioc_stat.convertIoCType(attribute_type))  # category 3
+                            if main._STAT_:
+                                connector.ioc_stat.addCategory3(attr_lower_case, connector.ioc_stat.convertIoCType(attribute_type))  # category 3
                             sharedIoC = True
                 elif LibIoC_DK.isHash(connector.misp_connection.get_event(curr_id)['Event']['info']):
                     e = connector.misp_connection.get_event(curr_id)
                     for a in e['Event']['Attribute']:
                         if a['category'] == 'Other' and a['value'] == event['Event']['info']:
-                            connector.ioc_stat.addCategory3(attr_lower_case, connector.ioc_stat.convertIoCType(attribute_type))  # category 3
+                            if main._STAT_:
+                                connector.ioc_stat.addCategory3(attr_lower_case, connector.ioc_stat.convertIoCType(attribute_type))  # category 3
                             sharedIoC = True
                 
                 if sharedIoC:
@@ -476,8 +574,8 @@ def addAttribute(connector, event, attr, filepath):
 #        elif attr[0] == 'Filepath':
 #            connector.misp_connection.add_named_attribute(event, 'External analysis', 'text', attr[1], comment='file path')
 #            attribute_added = True
-        elif (attribute_type == 'pdb' or (attribute_type == 'filepath' and 'pdb' in attr[2])):
-            connector.misp_connection.add_named_attribute(event, attribute_category, 'pdb', attr[2], comment=attribute_comment)
+        elif attribute_type == 'pdb':
+            connector.misp_connection.add_named_attribute(event, 'Artifacts dropped', 'pdb', attr[2], comment=attribute_comment)
             attribute_added = True
         elif attribute_type == 'signcheck':
             connector.misp_connection.add_named_attribute(event, attribute_category, 'text', attr[2], comment=attribute_comment)        
@@ -496,7 +594,7 @@ def addAttribute(connector, event, attr, filepath):
                 elif attribute_type == 'sha256':
                     connector.misp_connection.add_hashes(event, attribute_category, sha256=attr_lower_case, comment=attribute_comment)
                 attribute_added = True                
-            elif LibIoC_DK.isHash(event['Event']['info']) and connector.createMISPEventFromHash(attr_lower_case, filepath):
+            elif LibIoC_DK.isHash(event['Event']['info']) and connector.createMISPEventFromHash(attr_lower_case, filepath) and main._STAT_:
                 connector.ioc_stat.increaseAnalyzedAdditionalHash()
 
         elif attribute_type == 'string':
@@ -522,16 +620,19 @@ def addAttribute(connector, event, attr, filepath):
 
 
 
-
+# This main module generates CTI dataset from MISP database.
+# The final dataset only contains the necessary information to be the dataset excluding needless data such as organization info, uuid, Related Event.
+# The data included in the final dataset is defined in 'exportXML' function in MISPConenctor class. 
 if __name__ == '__main__':
+    
     # Load configuration file
     config_value = main.getConfig(main.config_file)
     file_names = main.getFileName(config_value['ReportRoot'])
     import IoCStatistics
     ioc_stat = IoCStatistics.IoCStatistics()
     misp = MISPConnector(config_value, ioc_stat)
-    
-    junk_size = 10006
+    '''
+    junk_size = 3000
     from_idx = 1
     to_idx = 10006
     num_junk = int(math.ceil(float(to_idx-from_idx+1)/junk_size))
@@ -542,5 +643,11 @@ if __name__ == '__main__':
             junk_to = to_idx
         filename = 'CTIDataset('+str(junk_from)+'-'+str(junk_to)+').xml'
         print 'Generating file...: '+filename
-        misp.exportXML(junk_from, junk_to, filename)
+        misp.exportXML_EID(junk_from, junk_to, filename)
         print ' Done!'
+    '''
+    
+    for yy in range(2008, 2019):
+        misp.exportXML_Date(yy, 'report', 'CTIDataset_'+str(yy)+'_ReportEvent.xml')
+        misp.exportXML_Date(yy, 'malware', 'CTIDataset_'+str(yy)+'_MalwareEvent.xml')
+        

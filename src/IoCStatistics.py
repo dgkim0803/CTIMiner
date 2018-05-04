@@ -8,6 +8,7 @@ This script implements the class to analyze the statistical features of CTI coll
 import os.path, subprocess, sys
 from xlrd import open_workbook
 import xml.etree.ElementTree as ET
+import LibIoC_DK
 
 class IoCStatistics:
     statistic_fname = 'IoCStatistics.xml'
@@ -338,11 +339,227 @@ class IoCStatistics:
     def increaseNumberOfReport(self):
         self.stat_tmp_general['Num_Of_Report'] += 1
         
-'''        
-if __name__ == '__main__':
-    stat = IoCStatistics()
-    ret = stat.checkIoCType('Embedded', '/Users/Andrew/Downloads/p795.pdf')
-    print ret
-'''
-
         
+#######################################################################################################################################
+
+
+import main, MISPConnector
+class PostStat:
+    
+    def __init__(self):
+        self.stat = {}
+        self.initStat()
+        
+    def initStat(self):
+        self.flushStat()
+        
+    def flushStat(self):
+        self.stat['report_events'] = 0
+        self.stat['hash_events'] = 0
+        self.stat['hash'] = 0
+        self.stat['IP'] = 0
+        self.stat['URL'] = 0
+        self.stat['email'] = 0
+        self.stat['cve'] = 0
+        self.stat['filename'] = 0
+        self.stat['pdb'] = 0
+        self.stat['code-sign'] = 0
+        self.stat['date'] = 0
+        self.stat['string'] = 0
+        return 
+    
+    def mergeStat(self, item):
+        if item == None:
+            return 
+        
+        self.stat['report_events'] = self.stat['report_events'] + item['report_events']
+        self.stat['hash_events'] = self.stat['hash_events'] + item['hash_events']
+        self.stat['hash'] = self.stat['hash'] + item['hash']
+        self.stat['IP'] = self.stat['IP'] + item['IP']
+        self.stat['URL'] = self.stat['URL'] + item['URL']
+        self.stat['email'] = self.stat['email'] + item['email']
+        self.stat['cve'] = self.stat['cve'] + item['cve']
+        self.stat['filename'] = self.stat['filename'] + item['filename']
+        self.stat['pdb'] = self.stat['pdb'] + item['pdb']
+        self.stat['code-sign'] = self.stat['code-sign'] + item['code-sign']
+        self.stat['date'] = self.stat['date'] + item['date']
+        self.stat['string'] = self.stat['string'] + item['string']
+        return 
+    
+    def add_report_events(self):
+        self.stat['report_events'] = self.stat['report_events'] + 1
+        
+    def add_hash_events(self):
+        self.stat['hash_events'] = self.stat['hash_events'] + 1
+        
+    def add_hash(self):
+        self.stat['hash'] = self.stat['hash'] + 1
+        
+    def add_IP(self):
+        self.stat['IP'] = self.stat['IP'] + 1
+        
+    def add_URL(self):
+        self.stat['URL'] = self.stat['URL'] + 1
+        
+    def add_email(self):
+        self.stat['email'] = self.stat['email'] + 1
+        
+    def add_cve(self):
+        self.stat['cve'] = self.stat['cve'] + 1
+        
+    def add_filename(self):
+        self.stat['filename'] = self.stat['filename'] + 1
+        
+    def add_pdb(self):
+        self.stat['pdb'] = self.stat['pdb'] + 1
+        
+    def add_codesign(self):
+        self.stat['code-sign'] = self.stat['code-sign'] + 1
+        
+    def add_date(self):
+        self.stat['date'] = self.stat['date'] + 1
+        
+    def add_string(self):
+        self.stat['string'] = self.stat['string'] + 1
+    
+    
+class postProcessIoCStatistics:
+    config_value = {}    
+    misp = None
+    
+    def __init__(self):
+        self.config_value = main.getConfig(main.config_file)
+        self.misp = MISPConnector.MISPConnector(self.config_value)
+        
+    def getIoCStatisticsOfReport(self, title):
+        stat = PostStat()
+
+        for yy in range(2008, 2018):
+            for mm in range(1,13):
+                if mm < 10:
+                    from_date = str(yy)+"-0%d-01" %(mm)
+                    to_date = str(yy)+"-0%d-31" %(mm)
+                else:
+                    from_date = str(yy)+"-%d-01" %(mm)
+                    to_date = str(yy)+"-%d-31" %(mm)
+                    
+                try:
+                    ee = self.misp.misp_connection.search(values=title, category="Other", type_attribute="comment", date_from=from_date, date_to=to_date)['response']
+                    for e in ee:
+                        stat.mergeStat( self.getEventIoCStatistics([e]) )
+                except Exception, e:
+                    print 'error getIoCStatisticsOfReport: %s (month=%d, year=%d)' %(str(e), mm, yy)
+                    continue        
+        return stat.stat        
+                  
+    def getYearlyIoCStatistics(self, year, monthly_processing=False):
+        if monthly_processing:
+            stat = PostStat()
+            for month in range(1,13):
+                e = self.getMISPEvent_of_month(year, month)
+                stat.mergeStat( self.getEventIoCStatistics(e) )
+            return stat.stat
+        else:
+            e = self.getMISPEvent_of_Year(year)
+            return self.getEventIoCStatistics(e)
+        #TODO: if there are more than two comment in a hash event, deduct the IoC from event
+        
+    def getMISPEvent_of_Year(self, year):
+        retval = []
+        ee = self.misp.misp_connection.search(date_from=year+"-01-01", date_to=year+"-12-31")['response']
+        for e in ee:
+            if LibIoC_DK.isHash(e['Event']['info']):
+                continue
+            else:
+                retval.append(e)
+        
+        hash_event = []
+        for r in retval:
+            print r['Event']['info']+'\n'
+            ee = self.misp.misp_connection.search(values=r['Event']['info'], category="Other", type_attribute="comment")['response']
+            for e in ee:
+                if LibIoC_DK.isHash(e['Event']['info']):
+                    hash_event.append(e)
+            
+        return retval + hash_event
+    
+    def getMISPEvent_of_month(self, year, month):
+        retval = []
+        from_date = ''
+        to_date = ''
+        if month < 10:
+            from_date = year+"-0%d-01" %(month)
+            to_date = year+"-0%d-31" %(month)  
+        else:
+            from_date = year+"-%d-01" %(month)
+            to_date = year+"-%d-31" %(month)  
+            
+        try:
+            ee = self.misp.misp_connection.search(date_from=from_date, date_to=to_date)['response']
+        except Exception, e:
+            print 'error misp_connection.search (month=%s, year=%s)' %(month, year)
+            return
+        
+        for e in ee:
+            if LibIoC_DK.isHash(e['Event']['info']):
+                continue
+            else:
+                retval.append(e)
+        
+        hash_event = []
+        for r in retval:
+            for yy in range(2008, 3000):
+                for mm in range(1,13):
+                    if mm < 10:
+                        from_date = str(yy)+"-0%d-01" %(mm)
+                        to_date = str(yy)+"-0%d-31" %(mm)
+                    else:
+                        from_date = str(yy)+"-%d-01" %(mm)
+                        to_date = str(yy)+"-%d-31" %(mm)  
+                    try:
+                        ee = self.misp.misp_connection.search(values=r['Event']['info'], category="Other", type_attribute="comment", date_from=from_date, date_to=to_date)['response']
+                        for e in ee:
+                            if LibIoC_DK.isHash(e['Event']['info']):
+                                hash_event.append(e)
+                    except Exception, e:
+                        print 'error %s / %s (month=%d, year=%d)' %(str(e), r['Event']['info'], mm, yy)
+                        continue
+            
+        return retval + hash_event
+        
+        return 
+    
+    def getEventIoCStatistics(self, event_list):
+        if event_list == None:
+            return
+        s = PostStat()
+        for e in event_list:
+            if LibIoC_DK.isHash(e['Event']['info']):
+                s.add_hash_events()
+            else:
+                s.add_report_events()
+                
+            for attr in e['Event']['Attribute']:
+                if 'md5' in attr['type'] or 'sha1' in attr['type'] or 'sha256' in attr['type']:
+                    s.add_hash()
+                elif 'ip' in attr['type']:
+                    s.add_IP()
+                elif 'url' in attr['type']:
+                    s.add_URL()
+                elif 'email' in attr['type']:
+                    s.add_email()
+                elif 'vulnerability' in attr['type']:
+                    s.add_cve()
+                elif 'filename' in attr['type']:
+                    s.add_filename()
+                elif 'pdb' in attr['type']:
+                    s.add_pdb()
+                elif 'text' in attr['type']:
+                    if 'TimeStamp' in attr['comment']:
+                        s.add_date()
+                    elif 'digital sign serial number' in attr['comment']:
+                        s.add_codesign()
+                    else:
+                        s.add_string()
+        return s.stat
+    

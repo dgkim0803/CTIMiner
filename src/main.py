@@ -21,23 +21,26 @@ _DEBUG_ = True
 _LOGGING_ = True
 
 # True : calculate statistical characteristics
-_STAT_ = True
+_STAT_ = False
 
 # 1 : generate MISP event in report-wise manner
 # 2 : generate MISP event malwar-wise manner first and create the event of the report using the left-over attributes.
 _MISP_EVENT_GENERATION_TYPE = 2
 
 _COUNTER_LIMIT_ = 1
-_DOWNLOAD_MALWARE_ = False
+_DOWNLOAD_MALWARE_ = True
 _PARALLELIZE_FILE_PROCESSING_ = False
 _PARALLELIZE_ATTRIB_ADDITION_ = False
 
 # the required system configuration should be set in the config file
-#config_file = 'config_PC.xml'
-config_file = 'config_Mac.xml'
+config_file = 'config.xml'
 log_file = 'log.txt'
 fileProcessingResult_file = 'fileProcessingResult.xml'
+# the data types to generate the dataset
+data_types_general = {'hash':True, 'IP':True, 'URL':True, 'email':True, 'cve':True, 'filename':True, 'pdb':True, 'code-sign':True, 'timestamp':True, 'string':True, 'registry':False, 'Filepath':False}
 hFile = None # log file handle
+                       
+
 if _LOGGING_:
     if os.path.isfile(log_file):
         hFile = open(log_file,"a")
@@ -46,6 +49,8 @@ if _LOGGING_:
 
 if _STAT_:
     ioc_stat = IoCStatistics.IoCStatistics()
+else:
+    ioc_stat = None
 
 ################################################################
 # Get the configuration values from the configuration file.
@@ -123,6 +128,7 @@ def getFileDate(filepath, config_value):
     else:
         f=open(config_value['ReportList'], 'rb')
         csv_reader = csv.reader(f, delimiter=',')
+        
         for row in csv_reader:
             if row[0] in filename:
                 return row[5]
@@ -133,6 +139,8 @@ def getFileDate(filepath, config_value):
                 hasher.update(buf)
             if row[4] is not None and row[4]!="" and row[4] in hasher.hexdigest():
                 return row[5]
+            
+        f.close()
     return
     
     
@@ -242,7 +250,7 @@ def processFileList(misp, file_names, config_value):
                 # add hash IoCs in each MISP events
                 if (_MODE_==2 or _MODE_==3) and len(hash_IoC) > 0:
                     for attr in hash_IoC:
-                        if misp.createMISPEvent(attr, f):
+                        if misp.createMISPEvent(attr, f) and _STAT_:
                             misp.ioc_stat.increaseAnalyzedHash()
                         else:
                             nonHash_IoC.append(attr)
