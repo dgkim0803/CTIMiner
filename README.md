@@ -19,4 +19,5 @@ Following is the example of event data. The left image is the report event and t
 
 ## Download Dataset
 The generated CTI dataset can be downloaded from the following link:
-https://goo.gl/zqSJs1
+https://goo.gl/onNfLx
+
