@@ -292,27 +292,27 @@ class Parser(object):
 		@author Robb Krasnow
 		 """
 		try:
-		 	if self.dedup:
+			if self.dedup:
 				self.dedup_store = set()
- 
-			 	self.handler.print_header(fpath)
- 
+
+				self.handler.print_header(fpath)
+
 			with open(fpath, 'rb') as csvfile:
 				csv_data = csv.reader(csvfile, delimiter=',', quotechar='|')
-				 
+				
 				for row in csv_data:
 					line = ', '.join(row).rstrip()
 					unicode_output = unicode(line, 'ascii', errors='ignore')
-										 
+										
 					self.parse_page(fpath, unicode_output, csv_data.line_num, 2)
- 
+
 			self.handler.print_footer(fpath)
 		except (KeyboardInterrupt, SystemExit):
 			raise
 		except Exception as e:
 			self.handler.print_error(fpath, e)
- 
- 
+
+
 	def parse_xls(self, f, fpath):
 		""" Created this function just to allow a user to use 'xls' as an input
 		option without any errors.
