@@ -8,10 +8,17 @@ from os.path import isfile, join
 from joblib.parallel import delayed
 from datetime import datetime
 import xml.etree.ElementTree as ET
-import itertools, csv, hashlib, requests, os, joblib
+import itertools, csv, hashlib, requests, os, joblib, sys
 from requests.packages.urllib3.exceptions import InsecureRequestWarning
 requests.packages.urllib3.disable_warnings(InsecureRequestWarning)
 import MISPConnector, IoCStatistics, LibIoC_DK
+
+
+_ver = sys.version_info
+#: Python 2.x?
+is_py2 = (_ver[0] == 2)
+#: Python 3.x?
+is_py3 = (_ver[0] == 3)
 
 # 1 : parsing APT report only
 # 2 : adding malware repository IoCs only
@@ -124,7 +131,8 @@ def parse_ioc(file_name):
 #    filepath: the APT report file path
 def getFileDate(filepath, config_value):
     filename = filepath[filepath.rfind('\\')+1:]
-    if config_value.has_key(' ') == False:
+    if (is_py2 and not config_value.has_key(' ')) or (is_py3 and ' ' not in config_value):
+#    if config_value.has_key(' ') == False:
         return
     else:
         f=open(config_value['ReportList'], 'rb')

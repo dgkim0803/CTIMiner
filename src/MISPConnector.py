@@ -55,8 +55,8 @@ class MISPConnector(object):
         except requests.exceptions.HTTPError:
             LibIoC_DK.debugging("HTTPError while querying "+filename, main._DEBUG_, main._LOGGING_, main.hFile) 
             return False
-        if not response.has_key('response'):
-            LibIoC_DK.debugging("The MISP file event NOT exist", main._DEBUG_, main._LOGGING_, main.hFile) 
+        if (main.is_py2 and not response.has_key('response')) or (main.is_py3 and 'response' not in response):
+            LibIoC_DK.debugging("The MISP file event NOT exist", main._DEBUG_, main._LOGGING_, main.hFile)
             return False
         for r in response['response']:
             if r['Event']['info'] == filename:
@@ -79,8 +79,8 @@ class MISPConnector(object):
         except requests.exceptions.HTTPError:
             LibIoC_DK.debugging("HTTPError occurred", main._DEBUG_, main._LOGGING_, main.hFile)
             return False 
-        
-        if not response.has_key('response'):
+        if (main.is_py2 and not response.has_key('response')) or (main.is_py3 and 'response' not in response):
+        #if not response.has_key('response'):
             LibIoC_DK.debugging("The MISP hash event NOT exist", main._DEBUG_, main._LOGGING_, main.hFile)
             return False
         for r in response['response']:
@@ -116,7 +116,7 @@ class MISPConnector(object):
             else:
                 eid = self.getMISPEventID(val[2])
                 e = self.misp_connection.get_event(eid)
-                self.misp_connection.add_named_attribute(e, 'Other', 'comment', LibIoC_DK.getFileName(filename))   # this will work as the ground truth of IoC
+                self.misp_connection.add_named_attribute(e, category='Other', type_value='comment', value=LibIoC_DK.getFileName(filename))   # this will work as the ground truth of IoC
             return True
         elif type(val)==list:
             if self.createMISPEventFromReport(val, filename, _date):
@@ -207,14 +207,14 @@ class MISPConnector(object):
                 _date = datetime.date(int(_date[2]),int(_date[0]),int(_date[1])).isoformat();
 
         event = self.misp_connection.new_event(0, 1, 2, LibIoC_DK.getFileName(filename), date=_date)
-        self.misp_connection.add_named_attribute(event, 'Other', 'comment', LibIoC_DK.getFileName(filename))   # this will work as the ground truth of IoC
+        self.misp_connection.add_named_attribute(event, category='Other', type_value='comment', value=LibIoC_DK.getFileName(filename))   # this will work as the ground truth of IoC
 
         if main._STAT_ and self.ioc_stat.report_name != filename:
             self.ioc_stat.setReportBuffer(filename)
         
         if main._PARALLELIZE_ATTRIB_ADDITION_:
             # Parallelized Version
-            print '[Report] Parallelized attribute storing...'
+            print('[Report] Parallelized attribute storing...')
             attr_added = joblib.Parallel(joblib.cpu_count())(delayed(addAttribute)(self, event, attr, filename) for attr in ioc)   
         else:
             # Sequential Version
@@ -258,7 +258,7 @@ class MISPConnector(object):
             return False
                 
         event = self.misp_connection.new_event(0, 1, 2, _hash)
-        self.misp_connection.add_named_attribute(event, 'Other', 'comment', LibIoC_DK.getFileName(filename))   # this will work as the ground truth of IoCs      
+        self.misp_connection.add_named_attribute(event, category='Other', type_value='comment', value=LibIoC_DK.getFileName(filename))   # this will work as the ground truth of IoCs      
         
         # the first three attributes in the result is md5, sha1, and sha256 representation malware hash, so manually store them in the event.
         md5=result.pop(0)[2]
@@ -275,8 +275,8 @@ class MISPConnector(object):
         if main._STAT_:
             self.ioc_stat.addCategory2('hash')
         
-        sample_path = self.config['SampleRoot']+'/'+LibIoC_DK.getReportPublicationYear(filename)
         if main._DOWNLOAD_MALWARE_:
+            sample_path = self.config['SampleRoot']+'/'+LibIoC_DK.getReportPublicationYear(filename)
             if not os.path.exists(sample_path+'/'+_hash):
                 malware_buffer = self.malware_repo_connector.downloadMalware(sha256, False)
                 if malware_buffer:
@@ -299,7 +299,7 @@ class MISPConnector(object):
            
         if main._PARALLELIZE_ATTRIB_ADDITION_:
             # Parallelized Version
-            print '[Hash] Parallelized attribute storing...'
+            print('[Hash] Parallelized attribute storing...')
             joblib.Parallel(joblib.cpu_count())(delayed(addAttribute)(self, event, attr) for attr in result)   
         else:
             # Sequential Version
@@ -317,13 +317,13 @@ class MISPConnector(object):
         if 'TimeStamp' in info:
             event['Event']['date'] = info['TimeStamp'].partition(" ")[0]
             self.misp_connection.update(event)
-            self.misp_connection.add_named_attribute(event, 'External analysis', 'text', info['TimeStamp'], comment='TimeStamp')  
+            self.misp_connection.add_named_attribute(event, type_value='External analysis', category='text', value=info['TimeStamp'], comment='TimeStamp')  
         elif 'Author' in info:
-            self.misp_connection.add_named_attribute(event, 'External analysis', 'text', info['Author'], comment='Author')  
+            self.misp_connection.add_named_attribute(event, type_value='External analysis', category='text', value=info['Author'], comment='Author')  
         elif 'Title' in info:
-            self.misp_connection.add_named_attribute(event, 'External analysis', 'text', info['Title'], comment='Title')  
+            self.misp_connection.add_named_attribute(event, type_value='External analysis', category='text', value=info['Title'], comment='Title')  
         elif 'Packer' in info:
-            self.misp_connection.add_named_attribute(event, 'External analysis', 'text', info['Packer'], comment='Packer')  
+            self.misp_connection.add_named_attribute(event, type_value='External analysis', category='text', value=info['Packer'], comment='Packer')  
             
         return
 
@@ -401,7 +401,7 @@ class MISPConnector(object):
             try:
                 event = self.misp_connection.get_event(i)
             except:
-                print 'exportXML exception!'
+                print('exportXML exception!')
                 continue
             if 'message' in event and event['message'] == 'Invalid event.':
                 continue
@@ -428,8 +428,8 @@ class MISPConnector(object):
                 to_date = str(year)+"-%d-31" %(mm)
             try:
                 ee = self.misp_connection.search(date_from=from_date, date_to=to_date)['response']
-            except Exception, e:
-                print 'error %s / (year=%d, month=%d)' %(str(e), year, mm)
+            except Exception as e:
+                print('error %s / (year=%d, month=%d)' %(str(e), year, mm))
                 continue
             
             for e in ee:
@@ -462,8 +462,8 @@ class MISPConnector(object):
                         for e in ee:
                             if LibIoC_DK.isHash(e['Event']['info']):
                                 root = self.addEventDataToElementTree(root, e)
-                    except Exception, e:
-                        print 'error %s / %s (month=%d, year=%d)' %(str(e), r['Event']['info'], mm, yy)
+                    except Exception as e:
+                        print('error %s / %s (month=%d, year=%d)' %(str(e), r['Event']['info'], mm, yy))
                         continue
                     
         tree = ET.ElementTree(root)
@@ -562,23 +562,23 @@ def addAttribute(connector, event, attr, filepath):
             connector.misp_connection.add_email_src(event, attr[2], comment=attribute_comment)
             attribute_added = True
         elif attribute_type == 'cve':
-            connector.misp_connection.add_named_attribute(event, attribute_category, 'vulnerability', attr[2], comment=attribute_comment)
+            connector.misp_connection.add_named_attribute(event, category=attribute_category, type_value='vulnerability', value=attr[2], comment=attribute_comment)
             attribute_added = True
 #        elif attribute_type == 'registry':
-#            connector.misp_connection.add_named_attribute(event, attribute_category, 'regkey', attr[2], comment=attribute_comment)
+#            connector.misp_connection.add_named_attribute(event, category=attribute_category, type_value='regkey', value=attr[2], comment=attribute_comment)
 #            attribute_added = True
         elif attribute_type == 'filename':
             if LibIoC_DK.isFileofInterest(attr[2]):
-                connector.misp_connection.add_named_attribute(event, attribute_category, 'filename', attr[2], comment=attribute_comment)
+                connector.misp_connection.add_named_attribute(event, category=attribute_category, type_value='filename', value=attr[2], comment=attribute_comment)
                 attribute_added = True
 #        elif attr[0] == 'Filepath':
-#            connector.misp_connection.add_named_attribute(event, 'External analysis', 'text', attr[1], comment='file path')
+#            connector.misp_connection.add_named_attribute(event, category='External analysis', type_value='text', value=attr[1], comment='file path')
 #            attribute_added = True
         elif attribute_type == 'pdb':
-            connector.misp_connection.add_named_attribute(event, 'Artifacts dropped', 'pdb', attr[2], comment=attribute_comment)
+            connector.misp_connection.add_named_attribute(event, category='Artifacts dropped', type_value='pdb', value=attr[2], comment=attribute_comment)
             attribute_added = True
         elif attribute_type == 'signcheck':
-            connector.misp_connection.add_named_attribute(event, attribute_category, 'text', attr[2], comment=attribute_comment)        
+            connector.misp_connection.add_named_attribute(event, category=attribute_category, type_value='text', value=attr[2], comment=attribute_comment)        
             attribute_added = True
                 
         # If a malware hash is found, check if it is already stored in MISP as an attribute.
@@ -598,7 +598,7 @@ def addAttribute(connector, event, attr, filepath):
                 connector.ioc_stat.increaseAnalyzedAdditionalHash()
 
         elif attribute_type == 'string':
-            connector.misp_connection.add_named_attribute(event, attribute_category, 'text', attr[2], comment=attribute_comment)        
+            connector.misp_connection.add_named_attribute(event, category=attribute_category, type_value='text', value=attr[2], comment=attribute_comment)        
             attribute_added = True
             
     # IoC statistics calculation.

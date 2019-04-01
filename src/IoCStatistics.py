@@ -180,9 +180,9 @@ class IoCStatistics:
                 self.report_buf = subprocess.check_output('python '+scripts_path+'/pdf2txt.py \"'+fname+'\"', shell=True).lower()
             except UnicodeError or subprocess.CalledProcessError:
                 if UnicodeError:
-                    print UnicodeError.message
+                    print(UnicodeError.message)
                 elif subprocess.CalledProcessError:
-                    print subprocess.CalledProcessError.message
+                    print(subprocess.CalledProcessError.message)
             
         elif fname.lower().endswith('.xls') or fname.lower().endswith('.xlsx'):
             self.report_type = 'xls'
@@ -193,14 +193,14 @@ class IoCStatistics:
                     try:
                         self.report_buf.cell(row,col).value = self.report_buf.cell(row,col).value.encode('utf-8').lower()
                     except UnicodeError:
-                        print UnicodeError.message+'\n'+self.report_buf.cell(row,col).value
+                        print(UnicodeError.message+'\n'+self.report_buf.cell(row,col).value)
                         
         else:
             self.report_type = 'etc'
             try:
                 self.report_buf = open(fname, 'r').read().encode('utf-8').lower()
             except UnicodeError:
-                print UnicodeError.message
+                print(UnicodeError.message)
             
         self.report_name = fname
         return
@@ -447,8 +447,8 @@ class postProcessIoCStatistics:
                     ee = self.misp.misp_connection.search(values=title, category="Other", type_attribute="comment", date_from=from_date, date_to=to_date)['response']
                     for e in ee:
                         stat.mergeStat( self.getEventIoCStatistics([e]) )
-                except Exception, e:
-                    print 'error getIoCStatisticsOfReport: %s (month=%d, year=%d)' %(str(e), mm, yy)
+                except Exception as e:
+                    print('error getIoCStatisticsOfReport: %s (month=%d, year=%d)' %(str(e), mm, yy))
                     continue        
         return stat.stat        
                   
@@ -475,7 +475,7 @@ class postProcessIoCStatistics:
         
         hash_event = []
         for r in retval:
-            print r['Event']['info']+'\n'
+            print(r['Event']['info']+'\n')
             ee = self.misp.misp_connection.search(values=r['Event']['info'], category="Other", type_attribute="comment")['response']
             for e in ee:
                 if LibIoC_DK.isHash(e['Event']['info']):
@@ -496,8 +496,8 @@ class postProcessIoCStatistics:
             
         try:
             ee = self.misp.misp_connection.search(date_from=from_date, date_to=to_date)['response']
-        except Exception, e:
-            print 'error misp_connection.search (month=%s, year=%s)' %(month, year)
+        except Exception as e:
+            print('error misp_connection.search (month=%s, year=%s)' %(month, year))
             return
         
         for e in ee:
@@ -521,8 +521,8 @@ class postProcessIoCStatistics:
                         for e in ee:
                             if LibIoC_DK.isHash(e['Event']['info']):
                                 hash_event.append(e)
-                    except Exception, e:
-                        print 'error %s / %s (month=%d, year=%d)' %(str(e), r['Event']['info'], mm, yy)
+                    except Exception as e:
+                        print('error %s / %s (month=%d, year=%d)' %(str(e), r['Event']['info'], mm, yy))
                         continue
             
         return retval + hash_event
@@ -563,3 +563,18 @@ class postProcessIoCStatistics:
                         s.add_string()
         return s.stat
     
+   
+if __name__ == '__main__':
+    pis = postProcessIoCStatistics()
+    f = open('postProcessIoCStatistics.txt', 'a')
+    stat = {}
+    for year in range(2008, 2018):
+        stat = pis.getYearlyIoCStatistics(str(year), monthly_processing=True)
+        f.write(str(year)+":"+str(stat)+"\n")
+        print(str(year)+":"+str(stat)+"\n")
+    
+    f_name = 'Novetta_Operation-Blockbuster_family_hashes.csv'
+    stat = pis.getIoCStatisticsOfReport(f_name)
+    f.write(f_name+":"+str(stat)+"\n")
+    print(f_name+":"+str(stat)+"\n")
+    f.close()

@@ -11,7 +11,7 @@ if platform.system() == 'Darwin':
     from aetypes import end
 from datetime import datetime
 from time import strftime, gmtime, ctime
-from pefile import pefile, peutils
+import pefile
 from olefile import olefile
 
 pattern = {}
@@ -165,7 +165,7 @@ def getOLEHeaderInfo(filename):
         return retval
     
     except AttributeError:
-        print pefile.PEFormatError.message
+        print(pefile.PEFormatError.message)
         return None
     except:
         return None
@@ -189,7 +189,7 @@ def getPEHeaderInfo(filename):
         return retval
         
     except pefile.PEFormatError:
-        print pefile.PEFormatError.message
+        print(pefile.PEFormatError.message)
         return None
     except:
         return None
@@ -223,7 +223,7 @@ def getPDFHeaderInfo(filename):
         return retval
     
     except PyPDF2.utils.PdfReadError:
-        print PyPDF2.utils.PdfReadError.message
+        print(PyPDF2.utils.PdfReadError.message)
         return None
     except:
         return None
@@ -284,7 +284,7 @@ def getReportPublicationYear(fullpath):
 
 def debugging(msg, debug, logging=False, f=None):
     if debug:
-        print "[%s] %s"%(str(datetime.now()),msg)
+        print("[%s] %s"%(str(datetime.now()),msg))
     if logging:
         f.write("[%s] %s\n"%(str(datetime.now()),msg))
     return
