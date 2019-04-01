@@ -28,12 +28,13 @@ _STAT_ = False
 _MISP_EVENT_GENERATION_TYPE = 2
 
 _COUNTER_LIMIT_ = 1
-_DOWNLOAD_MALWARE_ = True
+_DOWNLOAD_MALWARE_ = False
 _PARALLELIZE_FILE_PROCESSING_ = False
 _PARALLELIZE_ATTRIB_ADDITION_ = False
 
 # the required system configuration should be set in the config file
-config_file = 'config.xml'
+#config_file = 'config.xml'
+config_file = 'config_MAC.xml'
 log_file = 'log.txt'
 fileProcessingResult_file = 'fileProcessingResult.xml'
 # the data types to generate the dataset
@@ -123,7 +124,7 @@ def parse_ioc(file_name):
 #    filepath: the APT report file path
 def getFileDate(filepath, config_value):
     filename = filepath[filepath.rfind('\\')+1:]
-    if config_value.has_key('ReportList') == False:
+    if config_value.has_key(' ') == False:
         return
     else:
         f=open(config_value['ReportList'], 'rb')
