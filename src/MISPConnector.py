@@ -484,11 +484,9 @@ class MISPConnector(object):
         ET.SubElement(eventroot, 'id').text = tmp.find('id').text
         ET.SubElement(eventroot, 'date').text = tmp.find('date').text
         ET.SubElement(eventroot, 'info').text = tmp.find('info').text
-
-        attr_root = ET.SubElement(eventroot, 'Attribute')
         
         for i in tmp.find('Attribute').findall('item'):
-            item_root = ET.SubElement(attr_root, 'item')
+            item_root = ET.SubElement(eventroot, 'Attribute')
 
             ET.SubElement(item_root, 'category').text = i.find('category').text
             ET.SubElement(item_root, 'comment').text = i.find('comment').text
