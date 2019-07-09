@@ -17,6 +17,7 @@ Following is the event data structure and the comments for each data elements.
 </p>
 
 Following is the example of event data. The left image is the report event and the right one is corresponding malware event.
+Data in the report event dataset is retrieved from security reports by the parser, and that in the malware event is extracted from the analysis results from the malware repository.
 ![eventdataexample](https://user-images.githubusercontent.com/13994685/39529764-69100168-4e62-11e8-916b-16a8252b5506.jpg)
 
 ## Download Dataset (updated: 2019/07/09)
