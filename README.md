@@ -36,5 +36,5 @@ The generated CTI dataset covers the security reports published from 2008 to Jun
 | 2015  | [Download](https://1drv.ms/u/s!Al-x4GEOffcqgyEBoayYYGE-TYrE?e=laF8Ft) | [Download](https://1drv.ms/u/s!Al-x4GEOffcqgyLyna9hpTq3cI-l?e=Xv14NP) |
 | 2016  | [Download](https://1drv.ms/u/s!Al-x4GEOffcqgyTkJvV54QeNd8IU?e=FALJjC) | [Download](https://1drv.ms/u/s!Al-x4GEOffcqgyPQZ_yqyjYToDw3?e=ZKTSnb) |
 | 2017  | [Download](https://1drv.ms/u/s!Al-x4GEOffcqgyYkf-RCedJ6Q9IZ?e=apdgwL) | [Download](https://1drv.ms/u/s!Al-x4GEOffcqgyV-MzSN-JK-SJr9?e=qqXmLo) |
-| 2018  | [Download](https://1drv.ms/u/s!Al-x4GEOffcqgyfpiHw8YOzm_skD?e=Zdi2DA) | [Download]() |
-| 2019 (~June)  | [Download]() | [Download]() |
+| 2018  | [Download](https://1drv.ms/u/s!Al-x4GEOffcqgyilEcobBxSu97Oe?e=BZjcsO) | [Download](https://1drv.ms/u/s!Al-x4GEOffcqgyoVcw_MEDxy4Gpw?e=xY9wWj) |
+| 2019 (~June)  | [Download](https://1drv.ms/u/s!Al-x4GEOffcqgyvBjr1Bw9TmyC59?e=WtPGfi) | [Download](https://1drv.ms/u/s!Al-x4GEOffcqgykNGHo1EPNBqoiY?e=Qbypfp) |
