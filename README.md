@@ -24,6 +24,8 @@ Data in the report event dataset is retrieved from security reports by the parse
 ## Download Dataset (updated: 2019/07/09)
 The generated CTI dataset covers the security reports published from 2008 to June 2019. It can be downloaded from the following links:
 
+<p align="center">
+  
 | Year  | Report event | Malware event |
 | ------------- | ------------- | ------------- |
 | 2008  | [Download](https://1drv.ms/u/s!Al-x4GEOffcqgxXYo31MJo2e5mON?e=XRGU0d) | [Download](https://1drv.ms/u/s!Al-x4GEOffcqgxNzDECD1Wsj5kZA?e=5E0PDz) |
@@ -38,3 +40,5 @@ The generated CTI dataset covers the security reports published from 2008 to Jun
 | 2017  | [Download](https://1drv.ms/u/s!Al-x4GEOffcqgyYkf-RCedJ6Q9IZ?e=apdgwL) | [Download](https://1drv.ms/u/s!Al-x4GEOffcqgyV-MzSN-JK-SJr9?e=qqXmLo) |
 | 2018  | [Download](https://1drv.ms/u/s!Al-x4GEOffcqgyfpiHw8YOzm_skD?e=Zdi2DA) | [Download]() |
 | 2019 (~June)  | [Download]() | [Download]() |
+
+</p>
