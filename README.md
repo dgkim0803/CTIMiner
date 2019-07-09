@@ -17,7 +17,7 @@ Following is the event data structure and the comments for each data elements.
 Following is the example of event data. The left image is the report event and the right one is corresponding malware event.
 ![eventdataexample](https://user-images.githubusercontent.com/13994685/39529764-69100168-4e62-11e8-916b-16a8252b5506.jpg)
 
-## Download Dataset
-The generated CTI dataset can be downloaded from the following link:
+## Download Dataset (updated: 2019/07/09)
+The generated CTI dataset covers the security reports published from 2008 to June 2019. It can be downloaded from the following link:
 https://1drv.ms/u/s!Al-x4GEOffcqgkyei444hPoc3mg-
 
