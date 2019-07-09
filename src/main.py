@@ -28,7 +28,7 @@ _DEBUG_ = True
 _LOGGING_ = True
 
 # True : calculate statistical characteristics
-_STAT_ = False
+_STAT_ = True
 
 # 1 : generate MISP event in report-wise manner
 # 2 : generate MISP event malwar-wise manner first and create the event of the report using the left-over attributes.
@@ -86,9 +86,18 @@ def getFileName(root_dir):  # need to be modified!!!!! filenames are checked twi
         return
     retval = [];
     dir_list = os.listdir(root_dir)
+    dir_list.sort()
     for d in dir_list:
         if 'exception' in d:
             continue
+
+        #TODO
+        ##################################
+        # ADDED FOR SCN journal REVISION #
+        if (d != '2018' and d != '2019') and not(root_dir.__contains__('2018') or root_dir.__contains__('2019')):
+            continue
+        ##################################
+        
         tmp_name = join(root_dir,d)
         if isfile(tmp_name):
             retval.append(tmp_name)
@@ -130,8 +139,14 @@ def parse_ioc(file_name):
 # @ inputs
 #    filepath: the APT report file path
 def getFileDate(filepath, config_value):
-    filename = filepath[filepath.rfind('\\')+1:]
-    if (is_py2 and not config_value.has_key(' ')) or (is_py3 and ' ' not in config_value):
+    
+    if '\\' in filepath:
+        filename = filepath[filepath.rfind('\\')+1:]
+    elif '/' in filepath:
+        filename = filepath[filepath.rfind('/')+1:]
+    
+    
+    if (is_py2 and not config_value.has_key('ReportList')) or (is_py3 and 'ReportList' not in config_value):
 #    if config_value.has_key(' ') == False:
         return
     else:
@@ -152,6 +167,37 @@ def getFileDate(filepath, config_value):
         f.close()
     return
     
+    
+def getFileYear(filepath, config_value):
+    
+    if '\\' in filepath:
+        filename = filepath[filepath.rfind('\\')+1:]
+    elif '/' in filepath:
+        filename = filepath[filepath.rfind('/')+1:]
+    
+    
+    if (is_py2 and not config_value.has_key('ReportList')) or (is_py3 and 'ReportList' not in config_value):
+#    if config_value.has_key(' ') == False:
+        return
+    else:
+        f=open(config_value['ReportList'], 'rb')
+        csv_reader = csv.reader(f, delimiter=',')
+        
+        for row in csv_reader:
+            if row[0] in filename:
+                return row[6]
+            
+            hasher = hashlib.sha1()
+            with open(filepath, 'rb') as afile:
+                buf = afile.read()
+                hasher.update(buf)
+            if row[4] is not None and row[4]!="" and row[4] in hasher.hexdigest():
+                return row[6]
+            
+        f.close()
+    return
+    
+
     
 def processFile(misp, f, config_value):
     # Adding MISP by APT report-wise manner: one MISP event is consisted by one API report. 
@@ -215,6 +261,7 @@ def processFileList(misp, file_names, config_value):
     # Adding MISP by APT report-wise manner: one MISP event is consisted by one API report. 
     if _MISP_EVENT_GENERATION_TYPE == 1: 
         for f in file_names:
+            
             # check if the event data is already in MISP server 
             if misp.checkEventExist(LibIoC_DK.getFileName(f)) == True:
                 LibIoC_DK.debugging("The MISP file event ALREADY exists: %s" %(LibIoC_DK.getFileName(f)), _DEBUG_, _LOGGING_, hFile)
@@ -235,6 +282,7 @@ def processFileList(misp, file_names, config_value):
     # otherwise rest of IoCs are stored in one MISP event under the event name as the title of the report.
     elif _MISP_EVENT_GENERATION_TYPE == 2:
         for f in file_names:
+            
             if isFileProcessedBefore(processed_list_root, LibIoC_DK.getFileName(f)) or misp.checkMISPReportEventExist(LibIoC_DK.getFileName(f)):
                 continue
             nonHash_IoC = []
@@ -300,7 +348,7 @@ def openFileProcessingResult():
     return root
                     
 def addFileProcessingResult(root, fName, result):
-    ET.SubElement(root, 'file', {'title':fName,'result':result})
+    ET.SubElement(root, 'file', {'title':fName.decode('utf-8'),'result':result})
     return
  
 def saveFileProcessingResult(root):

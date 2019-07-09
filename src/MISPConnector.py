@@ -198,14 +198,17 @@ class MISPConnector(object):
             LibIoC_DK.debugging("The MISP report event ALREADY exists", main._DEBUG_, main._LOGGING_, main.hFile)
             return False
         
-        if _date is not None:
-            #_date = datetime.datetime.strptime(_date, "%m/%d/%Y").strftime("%Y-%m-%d")
-            _date = _date.split("/");
-            if int(_date[0]) > 12:
-                _date = datetime.date(int(_date[0]),int(_date[1]),int(_date[2])).isoformat();
-            else:
-                _date = datetime.date(int(_date[2]),int(_date[0]),int(_date[1])).isoformat();
-
+        try:
+            if _date is not None:
+                #_date = datetime.datetime.strptime(_date, "%m/%d/%Y").strftime("%Y-%m-%d")
+                _date = _date.split("/");
+                if int(_date[0]) > 12:
+                    _date = datetime.date(int(_date[0]),int(_date[1]),int(_date[2])).isoformat();
+                else:
+                    _date = datetime.date(int(_date[2]),int(_date[0]),int(_date[1])).isoformat();
+        except Exception as e:
+            print e
+                        
         event = self.misp_connection.new_event(0, 1, 2, LibIoC_DK.getFileName(filename), date=_date)
         self.misp_connection.add_named_attribute(event, category='Other', type_value='comment', value=LibIoC_DK.getFileName(filename))   # this will work as the ground truth of IoC
 
@@ -508,13 +511,19 @@ def addAttribute(connector, event, attr, filepath):
         attribute_comment = attribute_info[1]
     else:
         attribute_comment = ''
-    attr_lower_case = attr[2].lower()
+    attr_lower_case = attr[2].lower().replace('[.]', '.')
     
     attribute_added = False
     event_name, source_name = connector.getEventFileName(event = event)
-    event_name = event_name.encode('utf-8')
-    source_name = source_name.encode('utf-8')
     
+    if not event_name:
+        return False
+    
+    try:
+        event_name = event_name.encode('utf-8')
+        source_name = source_name.encode('utf-8')
+    except:
+        return False
 
     # if the attribute is already stored in the MISP event, skip it
     tmp_id = connector.checkAttribute(attr=attr[2])
@@ -645,7 +654,7 @@ if __name__ == '__main__':
         print ' Done!'
     '''
     
-    for yy in range(2008, 2019):
+    for yy in range(2018, 2020):
         misp.exportXML_Date(yy, 'report', 'CTIDataset_'+str(yy)+'_ReportEvent.xml')
         misp.exportXML_Date(yy, 'malware', 'CTIDataset_'+str(yy)+'_MalwareEvent.xml')
         

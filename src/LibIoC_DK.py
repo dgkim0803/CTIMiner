@@ -128,7 +128,11 @@ def checkIoCType(ioc):
 # @ outputs:
 #    the hash type if the value is a hash, otherwise return False.  
 def isHash(val):
-    val = val.encode('utf-8')
+    try:
+        val = val.encode('utf-8')
+    except:
+        return False
+        
     l = len(val)
     if l == 32:
         return 'MD5'
