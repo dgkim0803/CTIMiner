@@ -21,7 +21,7 @@ Data in the report event dataset is retrieved from security reports by the parse
 
 ![eventdataexample](https://user-images.githubusercontent.com/13994685/39529764-69100168-4e62-11e8-916b-16a8252b5506.jpg)
 
-## Download Dataset (updated: 2019/07/09)
+## Dataset (updated: 2019/07/09)
 The generated CTI dataset covers the security reports published from 2008 to June 2019. It can be downloaded from the following links:
   
 | Year  | Report event | Malware event |
