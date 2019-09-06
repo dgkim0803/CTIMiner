@@ -5,7 +5,7 @@ The specified description of this system and the dataset are under publication.
 
 This source code is tested on python 2.7, MISP 2.4.109 operated on Ubuntu 18.04.
 
-This work is published in Security and Communication Networks special issue on Data-Driven Cybersecurity as following title:
+This work is published in Security and Communication Networks special issue on Data-Driven Cybersecurity with following title:
 "Automated Dataset Generation System for Collaborative Research of Cyber Threat Analysis"
 
 ## System Architecture
